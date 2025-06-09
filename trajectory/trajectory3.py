@@ -126,7 +126,7 @@ def generate_true_trajectory(params):
         if current_idx >= n: break
     
     # 增强三维效果：添加XY平面扰动
-    x += 2.5 * np.sin(2*np.pi*t/80)  # X轴波动
+    x += 2.5 * np.sin(2*np.pi*t/80)  # X轴波动[1](@ref)
     y += 2.5 * np.cos(2*np.pi*t/75)  # Y轴波动
     
     # 添加环境扰动

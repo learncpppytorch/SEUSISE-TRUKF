@@ -6,7 +6,7 @@ class UKF:
     def __init__(self, params):
         # State dimension definitions
         self.pos_dim = 3  # Position dimension
-        self.vel_dim = 3  # Velocity dimension 
+        self.vel_dim = 3  # Velocity dimension
         self.att_dim = 3  # Attitude dimension
         self.bg_dim = 3   # Gyroscope bias dimension
         self.ba_dim = 3   # Accelerometer bias dimension
@@ -27,7 +27,7 @@ class UKF:
         self.x[9:12] = self.bg_nominal
         self.x[12:15] = self.ba_nominal
         
-        # Initialize covariance matrix
+        # Covariance matrix initialization
         self.P = np.diag([
             5**2, 5**2, 10**2,           # Position error covariance
             0.2**2, 0.2**2, 0.5**2,      # Velocity error covariance
@@ -45,7 +45,7 @@ class UKF:
             (0.001)**2, (0.001)**2, (0.001)**2      # Accelerometer bias process noise
         ]).astype(np.float64)
         
-        # Measurement noise matrices
+        # Measurement noise matrix
         self.R_usbl = np.diag(params.usbl_pos_error**2)
         self.R_dvl = np.diag([params.dvl_noise**2] * 3)
         self.R_depth = np.array([[params.depth_bias**2]])
@@ -185,6 +185,7 @@ class UKF:
         """Measurement update step
         
         Args:
+            z: Measurement
             sensor_type: Sensor type ('USBL', 'DVL', 'Depth')
             i: Time step index (optional)
             return_nis: Whether to return Normalized Innovation Squared (NIS)
@@ -192,19 +193,16 @@ class UKF:
         Returns:
             nis: Normalized Innovation Squared value (if return_nis is True)
         """
-        # Create copy of input data to avoid modifying original
         z = z.copy()
         
-        # Add data validity check
         if sensor_type == 'USBL':
-            # USBL data anomaly detection
-            if np.any(np.abs(z) > 1000):  
+            if np.any(np.abs(z) > 10000): 
                 print("USBL data anomaly, skipping update")
                 return None if return_nis else None
                 
         elif sensor_type == 'DVL':
             # DVL data anomaly detection
-            if np.any(np.abs(z) > 100):    
+            if np.any(np.abs(z) > 100):  
                 print("DVL data anomaly, skipping update")
                 return None if return_nis else None
         
@@ -264,7 +262,7 @@ class UKF:
         if i is not None:
             self.nav_pos[:,i] = self.pos_nominal
             
-        # Return NIS value
+        # Return NIS value if requested
         if return_nis:
             return nis
 
@@ -323,13 +321,13 @@ class UKF:
                 
             # Check if DVL velocity is abnormal
             if np.any(np.abs(measurement.get('velocity', np.zeros(3))) > threshold):
-                print("DVL velocity abnormal, skipping update")
+                print("DVL velocity anomaly, skipping update")
                 return False
                 
         elif sensor_type == 'USBL':
             # Check if USBL position is abnormal
             if np.any(np.abs(measurement) > 1000):
-                print("USBL position abnormal, skipping update")
+                print("USBL position anomaly, skipping update")
                 return False
                 
         return True

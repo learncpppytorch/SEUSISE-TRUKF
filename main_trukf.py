@@ -18,14 +18,14 @@ def main():
     data_mode = 'simulation'
     
     if data_mode == 'simulation':
-        # ===== Simulation Mode =====
+        # ===== Simulation Data Mode =====
         # Generate simulation trajectory
         true_pos, true_vel, true_gyro, true_accel, t = generate_true_trajectory(params)
         n = len(t)
         
         # Check trajectory start and end points
-        print(f"Trajectory start: {true_pos[:,0]}")
-        print(f"Trajectory end: {true_pos[:,-1]}")
+        print(f"Trajectory start point: {true_pos[:,0]}")
+        print(f"Trajectory end point: {true_pos[:,-1]}")
         
         # Generate sensor data
         gyro_err, accel_err = EnhancedErrorModels.sins_error_model(
@@ -59,138 +59,134 @@ def main():
         
         # Extract reference data (true trajectory)
         true_pos = np.zeros((3, data_ref['timestamps_ref'].shape[0]))
-        # Convert lat/lon to local coordinate system (simplified, origin at start point)
+        # Convert lat/lon to local coordinates
         lat_ref = data_ref['lat_ref'].flatten()
         lon_ref = data_ref['lon_ref'].flatten()
-        # Simple lat/lon to meters conversion (approximate, for visualization only)
+  
         earth_radius = 6371000  # Earth radius in meters
-        lat0, lon0 = lat_ref[0], lon_ref[0]  # Start point as origin
+        lat0, lon0 = lat_ref[0], lon_ref[0]  # Starting point as origin
         true_pos[0, :] = (lon_ref - lon0) * np.cos(np.radians(lat0)) * np.pi * earth_radius / 180.0
         true_pos[1, :] = (lat_ref - lat0) * np.pi * earth_radius / 180.0
-        # Check att_ref structure and extract Z coordinate
+ 
         print(f"att_ref shape: {data_ref['att_ref'].shape}")
-        # Use height data as Z coordinate, if att_ref doesn't contain height, use 0
+
         if 'GNSSReading_diff' in data['sensorData'][0][0].dtype.names:
-            # Get initial depth from first data point
+  
             initial_depth = data['sensorData'][0][0]['GNSSReading_diff'][0, 0][0, 2] if data['sensorData'][0][0]['GNSSReading_diff'][0, 0].size > 0 else 0
-            true_pos[2, :] = -initial_depth  # Use negative depth as Z coordinate (depth positive downward, Z axis positive upward)
+            true_pos[2, :] = -initial_depth 
         else:
-            true_pos[2, :] = 0  # If no depth data, use 0
+            true_pos[2, :] = 0  # Use 0 if no depth data available
         
-        # Extract true velocity
         true_vel = data_ref['Velocity_ref'].T  # Transpose to match shape (3, n)
         
         # Extract timestamps
         t = data_ref['timestamps_ref'].flatten()
         n = len(t)
         
-        # Extract sensor data
         sensor_data = data['sensorData'][0]
         
         # Initial state (first row of data)
         initial_state = sensor_data[0]
         
-        # Extract IMU data (gyro and accelerometer)
         gyro_readings = np.zeros((3, n))
         accel_readings = np.zeros((3, n))
         
-        # Extract USBL data (GNSSReading)
         usbl_meas = np.zeros((3, n))
         
-        # Extract DVL data
         dvl_meas = np.zeros((3, n))
         
-        # Extract depth data
         depth_meas = np.zeros(n)
         
-        # Fill sensor data
         for i in range(1, n):
             if i < len(sensor_data):
-                # IMU data - ensure data exists and can be accessed
+         
                 if 'GyroReadings' in sensor_data[i].dtype.names and sensor_data[i]['GyroReadings'][0, 0].size > 0:
                     try:
-                        # Get raw data
+           
                         gyro_data = sensor_data[i]['GyroReadings'][0, 0]
-                        # Check data shape
+         
                         if gyro_data.size == 3 or len(gyro_data.shape) == 1 and gyro_data.shape[0] == 3:
-                            # Normal 3D data
+            
                             gyro_readings[:, i] = gyro_data.flatten()
                         elif len(gyro_data.shape) == 1 and gyro_data.shape[0] > 3:
-                            # Abnormal shape data, take first 3 elements
-                            print(f"Note: Gyro data {i} has abnormal shape ({gyro_data.shape}), taking first 3 elements")
+      
+                            print(f"Note: Gyro data shape abnormal at index {i} ({gyro_data.shape}), using first 3 elements only")
                             gyro_readings[:, i] = gyro_data[:3]
                         elif len(gyro_data.shape) > 1:
                             if len(gyro_data.shape) == 2 and gyro_data.shape[0] >= 1 and gyro_data.shape[1] >= 3:
+              
                                 gyro_readings[:, i] = np.mean(gyro_data[:, :3], axis=0)
                             else:
-                                # Unhandleable case, use previous valid value
+            
                                 if i > 1 and not np.all(gyro_readings[:, i-1] == 0):
                                     gyro_readings[:, i] = gyro_readings[:, i-1]
                         else:
-                            # Other abnormal cases, keep as zero
-                            print(f"Warning: Cannot handle gyro data {i}, shape: {gyro_data.shape}")
+             
+                            print(f"Warning: Unable to process gyro data at index {i}, shape: {gyro_data.shape}")
                     except (ValueError, IndexError) as e:
-                        print(f"Warning: Error processing gyro data {i}: {e}")
-                        # Use previous valid value
+                        print(f"Warning: Error processing gyro data at index {i}: {e}")
+            
                         if i > 1 and not np.all(gyro_readings[:, i-1] == 0):
                             gyro_readings[:, i] = gyro_readings[:, i-1]
                 
                 if 'AccelReadings' in sensor_data[i].dtype.names and sensor_data[i]['AccelReadings'][0, 0].size > 0:
                     try:
-                        # Get raw data
                         accel_data = sensor_data[i]['AccelReadings'][0, 0]
-                        # Check data shape
+            
                         if accel_data.size == 3 or len(accel_data.shape) == 1 and accel_data.shape[0] == 3:
-                            # Normal 3D data
+                    
                             accel_readings[:, i] = accel_data.flatten()
                         elif len(accel_data.shape) == 1 and accel_data.shape[0] > 3:
-                            print(f"Note: Accelerometer data {i} has abnormal shape ({accel_data.shape}), taking first 3 elements")
+                    
+                            print(f"Note: Accelerometer data shape abnormal at index {i} ({accel_data.shape}), using first 3 elements only")
                             accel_readings[:, i] = accel_data[:3]
                         elif len(accel_data.shape) > 1:
                             if len(accel_data.shape) == 2 and accel_data.shape[0] >= 1 and accel_data.shape[1] >= 3:
+             
                                 accel_readings[:, i] = np.mean(accel_data[:, :3], axis=0)
                             else:
+                     
                                 if i > 1 and not np.all(accel_readings[:, i-1] == 0):
                                     accel_readings[:, i] = accel_readings[:, i-1]
                         else:
-                            print(f"Warning: Cannot handle accelerometer data {i}, shape: {accel_data.shape}")
+            
+                            print(f"Warning: Unable to process accelerometer data at index {i}, shape: {accel_data.shape}")
                     except (ValueError, IndexError) as e:
-                        print(f"Warning: Error processing accelerometer data {i}: {e}")
+                        print(f"Warning: Error processing accelerometer data at index {i}: {e}")
+                   
                         if i > 1 and not np.all(accel_readings[:, i-1] == 0):
                             accel_readings[:, i] = accel_readings[:, i-1]
                 
-                # USBL data (GNSSReading) - convert to local coordinate system
                 if 'GNSSReading' in sensor_data[i].dtype.names and sensor_data[i]['GNSSReading'][0, 0].size > 0:
                     gnss = sensor_data[i]['GNSSReading'][0, 0].flatten()
                     if len(gnss) >= 3:
-                        # Convert lat/lon to local coordinates
                         usbl_meas[0, i] = (gnss[1] - lon0) * np.cos(np.radians(lat0)) * np.pi * earth_radius / 180.0
                         usbl_meas[1, i] = (gnss[0] - lat0) * np.pi * earth_radius / 180.0
-                        usbl_meas[2, i] = gnss[2]  # Height
+                        usbl_meas[2, i] = gnss[2]  
                 
                 # DVL data
                 if 'DVL_Velocity' in sensor_data[i].dtype.names and sensor_data[i]['DVL_Velocity'][0, 0].size > 0:
                     try:
                         dvl_data = sensor_data[i]['DVL_Velocity'][0, 0]
-                        # Check data shape
+               
                         if dvl_data.size == 3 or len(dvl_data.shape) == 1 and dvl_data.shape[0] == 3:
                             dvl_meas[:, i] = dvl_data.flatten()
                         elif len(dvl_data.shape) == 1 and dvl_data.shape[0] > 3:
-                            print(f"Note: DVL data {i} has abnormal shape ({dvl_data.shape}), taking first 3 elements")
+                            print(f"Note: DVL data shape abnormal at index {i} ({dvl_data.shape}), using first 3 elements only")
                             dvl_meas[:, i] = dvl_data[:3]
                         else:
                             if i > 1 and not np.all(dvl_meas[:, i-1] == 0):
                                 dvl_meas[:, i] = dvl_meas[:, i-1]
                     except (ValueError, IndexError) as e:
-                        print(f"Warning: Error processing DVL data {i}: {e}")
+                        print(f"Warning: Error processing DVL data at index {i}: {e}")
+         
                         if i > 1 and not np.all(dvl_meas[:, i-1] == 0):
                             dvl_meas[:, i] = dvl_meas[:, i-1]
-                
-                # Depth data
+     
                 if 'GNSSReading_diff' in sensor_data[i].dtype.names and sensor_data[i]['GNSSReading_diff'][0, 0].size > 0:
                     gnss_diff = sensor_data[i]['GNSSReading_diff'][0, 0].flatten()
                     if len(gnss_diff) >= 3:
-                        depth_meas[i] = gnss_diff[2]
+                        depth_meas[i] = gnss_diff[2] 
         
         # Use real IMU data instead of simulation data
         true_gyro = gyro_readings
@@ -217,7 +213,7 @@ def main():
             gyro_meas = true_gyro[:,i].copy() + gyro_err[i].copy()
             accel_meas = true_accel[:,i].copy() + accel_err[i].copy()
         else:
-            # Real data mode: use measurements directly (errors already included)
+            # Real data mode: use measurements directly (errors included)
             gyro_meas = true_gyro[:,i].copy()
             accel_meas = true_accel[:,i].copy()
 
@@ -227,8 +223,9 @@ def main():
         # 3. Store current position estimate
         TRUKF_pos[:,i] = kf.get_position().copy()
 
-        # 4. TRUKF update step - depth update first to stabilize z-axis
+        # 4. TRUKF update step
         if i % update_interval == 0:
+      
             # Depth update priority
             if not np.isnan(depth_meas[i]):
                 z_depth = np.array([depth_meas[i]]).copy()
@@ -247,20 +244,21 @@ def main():
                 kf.update(z_dvl, 'DVL', i)
                 TRUKF_pos[:,i] = kf.get_position().copy()
 
+
         # Print key state variables
         if i % print_interval == 0:  # Adjust print frequency based on data mode
             print(f"Iter {i}:")
             print(f"    True Pos: {true_pos[:,i]}")
             print(f"    TRUKF Est Pos: {TRUKF_pos[:,i]}")
             print(f"    Gyro Bias: {kf.get_gyro_bias()}")
-            print(f"    Accel Bias: {kf.get_accel_bias()}")
+            print(f"    Accelerometer Bias: {kf.get_accel_bias()}")
             print(f"    P[0,0] (Position Error Covariance): {kf.P[0,0]}")
-            print(f"Position Error: {np.linalg.norm(true_pos[:,i] - TRUKF_pos[:,i]):.3f} m")
-            # Print attitude angles
+            print(f"Position Error: {np.linalg.norm(true_pos[:,i] - TRUKF_pos[:,i]):.3f} meters")
+            # Print attitude angle information
             print(f"    Attitude Angles(rad): {kf.get_euler_angles()}")
             
-            # Print Sigma point distribution (debug use, only print first time in simulation mode)
-            if i == print_interval and data_mode == 'simulation':
+            # Print Sigma point distribution (for debugging, only print first time in simulation mode)
+            if i == print_interval and data_mode == 'simulation':  
                 X = kf.generate_sigma_points()
                 print("\nSigma Point Distribution Example (First 3 Points):")
                 for j in range(3):
@@ -274,7 +272,7 @@ def main():
     visualize_results(true_pos, TRUKF_pos, true_vel, dvl_meas, depth_meas, t, gyro_meas, accel_meas, usbl_meas, data_mode)
 
 def visualize_results(true_pos, TRUKF_pos, true_vel, dvl_meas, depth_meas, t, gyro_meas, accel_meas, usbl_meas, data_mode='simulation'):
-    """Visualization and error analysis"""
+    """Visualization and Error Analysis"""
     # Create large figure window
     plt.figure(figsize=(20, 15))
     
@@ -305,7 +303,7 @@ def visualize_results(true_pos, TRUKF_pos, true_vel, dvl_meas, depth_meas, t, gy
     ax2.legend(fontsize=10)
     ax2.grid(True)
     
-    # 3. Different visualization content based on data mode
+    # 3. Choose different visualization content based on data mode
     ax3 = plt.subplot(223)
     if data_mode == 'simulation':
         # Simulation mode: show DVL velocity measurements
@@ -328,9 +326,9 @@ def visualize_results(true_pos, TRUKF_pos, true_vel, dvl_meas, depth_meas, t, gy
         
         # Create availability time series
         sensor_availability = np.zeros((3, len(t)))
-        sensor_availability[0, usbl_available] = 1  # USBL available=1, unavailable=0
-        sensor_availability[1, dvl_available] = 1   # DVL available=1, unavailable=0
-        sensor_availability[2, depth_available] = 1 # Depth available=1, unavailable=0
+        sensor_availability[0, usbl_available] = 1  # USBL available = 1, unavailable = 0
+        sensor_availability[1, dvl_available] = 1   # DVL available = 1, unavailable = 0
+        sensor_availability[2, depth_available] = 1 # Depth available = 1, unavailable = 0
         
         # Plot sensor availability
         ax3.plot(t, sensor_availability[0] + 0.1, 'r-', label='USBL Available', linewidth=1.5)
@@ -367,21 +365,21 @@ def visualize_results(true_pos, TRUKF_pos, true_vel, dvl_meas, depth_meas, t, gy
     
     # Save position data to CSV file
     print("\nSaving position data to CSV file...")
-    # Prepare data: timestamp, true position(XYZ), TRUKF estimated position(XYZ)
+    # Prepare data: timestamps, true positions(XYZ), TRUKF estimated positions(XYZ)
     csv_data = np.zeros((len(t), 7))  # 7 columns: time, true X/Y/Z, estimated X/Y/Z
-    csv_data[:, 0] = t  # Timestamp
-    csv_data[:, 1:4] = true_pos.T  # True position (transposed to match row format)
-    csv_data[:, 4:7] = TRUKF_pos.T   # TRUKF estimated position (transposed to match row format)
+    csv_data[:, 0] = t  # timestamps
+    csv_data[:, 1:4] = true_pos.T  # true positions (transposed to match row format)
+    csv_data[:, 4:7] = TRUKF_pos.T   # TRUKF estimated positions (transposed to match row format)
     
     # Set column headers
     header = "Time(s),True Position X(m),True Position Y(m),True Position Z(m),TRUKF Estimated Position X(m),TRUKF Estimated Position Y(m),TRUKF Estimated Position Z(m)"
     
-    # Set different filename based on data mode
+    # Set filename based on data mode
     filename = f"trukf_position_results_{data_mode}.csv"
     
     # Save to CSV file
     np.savetxt(filename, csv_data, delimiter=",", header=header, comments="")
-    print(f"Position data saved to '{filename}'")
+    print(f"Position data has been saved to '{filename}'")
 
 if __name__ == "__main__":
     main()

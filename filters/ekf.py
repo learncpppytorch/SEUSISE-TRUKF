@@ -90,7 +90,7 @@ def rotation_matrix_to_euler(R):
     return np.array([roll, pitch, yaw])
 
 def skew(v):
-    """Calculate skew-symmetric matrix of a vector
+    """Calculate skew-symmetric matrix of vector
     Input: v[3] - 3D vector
     Output: S[3,3] - Skew-symmetric matrix
     """
@@ -99,8 +99,6 @@ def skew(v):
         [v[2], 0, -v[0]],
         [-v[1], v[0], 0]
     ])
-
-
 
 class EKF:
     def __init__(self, params):
@@ -147,7 +145,7 @@ class EKF:
 
     def predict(self, dt, gyro, accel):
         """Prediction step"""
-        # 1. Compensate IMU bias
+        # 1. Compensate IMU biases
         gyro_corrected = gyro - self.bg
         accel_corrected = accel - self.ba
         
@@ -177,20 +175,24 @@ class EKF:
         """Measurement update step
         
         Parameters:
+            z: Measurement
             sensor_type: Sensor type ('USBL', 'DVL', 'Depth')
             time_step: Time step (optional)
             dt: Time interval (optional)
             return_nis: Whether to return Normalized Innovation Squared (NIS)
+            
         Returns:
             nis: Normalized Innovation Squared value (if return_nis is True)
         """
-        if sensor_type == 'USBL':           
-            if np.any(np.abs(z) > 1000):  
+     
+        if sensor_type == 'USBL':
+          
+            if np.any(np.abs(z) > 10000):  # Position jump detection
                 print("Abnormal USBL data, skipping update")
                 return None if return_nis else None
                 
         elif sensor_type == 'DVL':
-            # DVL data anomaly detection
+         
             if np.any(np.abs(z) > 100):    
                 print("Abnormal DVL data, skipping update")
                 return None if return_nis else None
@@ -233,7 +235,7 @@ class EKF:
         I = np.eye(self.total_dim)
         self.P = (I - K @ H) @ self.P @ (I - K @ H).T + K @ R @ K.T
         
-        # Return NIS value
+        # Return NIS value (if requested)
         if return_nis:
             return nis
 

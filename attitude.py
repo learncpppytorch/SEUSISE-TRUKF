@@ -1,9 +1,9 @@
 import numpy as np
 
 def euler_to_quaternion(euler):
-    """Convert Euler angles to quaternion
-    Input: euler[3] - [roll, pitch, yaw]
-    Output: quaternion[4] - [w, x, y, z]
+    """欧拉角转四元数
+    输入：euler[3] - [roll, pitch, yaw]
+    输出：quaternion[4] - [w, x, y, z]
     """
     roll, pitch, yaw = euler
     cr, cp, cy = np.cos(roll/2), np.cos(pitch/2), np.cos(yaw/2)
@@ -17,9 +17,9 @@ def euler_to_quaternion(euler):
     return np.array([w, x, y, z])
 
 def quaternion_to_euler(q):
-    """Convert quaternion to Euler angles
-    Input: quaternion[4] - [w, x, y, z]
-    Output: euler[3] - [roll, pitch, yaw]
+    """四元数转欧拉角
+    输入：quaternion[4] - [w, x, y, z]
+    输出：euler[3] - [roll, pitch, yaw]
     """
     w, x, y, z = q
     
@@ -40,7 +40,7 @@ def quaternion_to_euler(q):
     return np.array([roll, pitch, yaw])
 
 def quaternion_multiply(q1, q2):
-    """Quaternion multiplication"""
+    """四元数乘法"""
     w1, x1, y1, z1 = q1
     w2, x2, y2, z2 = q2
     
@@ -52,18 +52,18 @@ def quaternion_multiply(q1, q2):
     return np.array([w, x, y, z])
 
 def attitude_update(current_att, gyro, dt):
-    """Attitude update function
-    Input:
-        current_att: current attitude angles [roll, pitch, yaw]
-        gyro: gyroscope measurements [wx, wy, wz]
-        dt: time interval
-    Output:
-        new_att: updated attitude angles [roll, pitch, yaw]
+    """姿态更新函数
+    输入：
+        current_att: 当前姿态角[roll, pitch, yaw]
+        gyro: 陀螺仪测量值[wx, wy, wz]
+        dt: 时间间隔
+    输出：
+        new_att: 更新后的姿态角[roll, pitch, yaw]
     """
-    # 1. Convert current attitude to quaternion
+    # 1. 当前姿态角转换为四元数
     current_quat = euler_to_quaternion(current_att)
     
-    # 2. Convert angular velocity to quaternion increment
+    # 2. 角速度转换为四元数增量
     wx, wy, wz = gyro
     dq = np.array([
         1,
@@ -71,62 +71,64 @@ def attitude_update(current_att, gyro, dt):
         0.5 * wy * dt,
         0.5 * wz * dt
     ])
-    dq = dq / np.linalg.norm(dq)  # Normalize
+    dq = dq / np.linalg.norm(dq)  # 归一化
     
-    # 3. Update quaternion
+    # 3. 四元数更新
     new_quat = quaternion_multiply(current_quat, dq)
-    new_quat = new_quat / np.linalg.norm(new_quat)  # Normalize
+    new_quat = new_quat / np.linalg.norm(new_quat)  # 归一化
     
-    # 4. Convert back to Euler angles
+    # 4. 转换回欧拉角
     new_att = quaternion_to_euler(new_quat)
     
     return new_att
 
 def gravity_compensation(accel, att):
-    """Gravity compensation
-    Input:
-        accel: accelerometer measurements [ax, ay, az]
-        att: attitude angles [roll, pitch, yaw]
-    Output:
-        compensated_accel: compensated acceleration
+    """重力补偿
+    输入：
+        accel: 加速度计测量值[ax, ay, az]
+        att: 姿态角[roll, pitch, yaw]
+    输出：
+        compensated_accel: 补偿后的加速度
     """
-    # Gravity acceleration
+    # 重力加速度
     g = 9.81
     
-    # Calculate Direction Cosine Matrix (DCM)
+    # 计算姿态余弦矩阵（DCM）
     roll, pitch, yaw = att
     cr, sr = np.cos(roll), np.sin(roll)
     cp, sp = np.cos(pitch), np.sin(pitch)
     cy, sy = np.cos(yaw), np.sin(yaw)
     
-    # DCM from navigation frame to body frame
+    # DCM从导航系到机体系
     Cnb = np.array([
         [cp*cy, cp*sy, -sp],
         [sr*sp*cy-cr*sy, sr*sp*sy+cr*cy, sr*cp],
         [cr*sp*cy+sr*sy, cr*sp*sy-sr*cy, cr*cp]
     ])
     
-    # Gravity projection in navigation frame
+    # 重力在导航系下的投影
     g_n = np.array([0, 0, g])
     
-    # Remove gravity effect
+    # 去除重力影响
     compensated_accel = accel - Cnb @ g_n
     
     return compensated_accel
 
+
+    
 def euler_to_rotation_matrix(euler):
-    """Convert Euler angles to rotation matrix
-    Input: euler[3] - [roll, pitch, yaw]
-    Output: R[3,3] - rotation matrix from navigation frame to body frame
+    """欧拉角转旋转矩阵
+    输入：euler[3] - [roll, pitch, yaw]
+    输出：R[3,3] - 从导航系到机体系的旋转矩阵
     """
     roll, pitch, yaw = euler
     
-    # Calculate sine and cosine of the three angles
+    # 分别计算三个角度的正弦和余弦
     cr, sr = np.cos(roll), np.sin(roll)
     cp, sp = np.cos(pitch), np.sin(pitch)
     cy, sy = np.cos(yaw), np.sin(yaw)
     
-    # Build rotation matrix
+    # 构建旋转矩阵
     R = np.array([
         [cp*cy, cp*sy, -sp],
         [sr*sp*cy-cr*sy, sr*sp*sy+cr*cy, sr*cp],
@@ -136,25 +138,25 @@ def euler_to_rotation_matrix(euler):
     return R
 
 def rotation_matrix_to_euler(R):
-    """Convert rotation matrix to Euler angles
-    Input: R[3,3] - rotation matrix from navigation frame to body frame
-    Output: euler[3] - [roll, pitch, yaw]
+    """旋转矩阵转欧拉角
+    输入：R[3,3] - 从导航系到机体系的旋转矩阵
+    输出：euler[3] - [roll, pitch, yaw]
     """
-    # Extract pitch angle (y-axis rotation)
+    # 提取 pitch 角 (绕y轴)
     pitch = -np.arcsin(R[0,2])
     
-    # Extract roll angle (x-axis rotation)
+    # 提取 roll 角 (绕x轴)
     roll = np.arctan2(R[1,2], R[2,2])
     
-    # Extract yaw angle (z-axis rotation)
+    # 提取 yaw 角 (绕z轴)
     yaw = np.arctan2(R[0,1], R[0,0])
     
     return np.array([roll, pitch, yaw])
 
 def skew(v):
-    """Calculate skew-symmetric matrix of a vector
-    Input: v[3] - 3D vector
-    Output: S[3,3] - skew-symmetric matrix
+    """计算向量的反对称矩阵
+    输入：v[3] - 三维向量
+    输出：S[3,3] - 反对称矩阵
     """
     return np.array([
         [0, -v[2], v[1]],

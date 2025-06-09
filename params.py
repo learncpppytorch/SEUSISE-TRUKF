@@ -2,34 +2,37 @@ import numpy as np
 
 class EnhancedSensorParams:
     def __init__(self):
-        # SINS error parameters (with time-varying characteristics)
-        self.gyro_bias = np.array([0.1, 0.15, -0.08])  # Fixed bias (deg/hour)
-        self.gyro_rw = np.array([0.01, 0.015, 0.008])  # Random walk (deg/√h)
-        self.accel_bias = np.array([0.02, 0.03, 0.01])  # Fixed bias (mg)
-        self.accel_markov = np.array([0.005, 0.007, 0.003])  # First-order Markov process (mg)
-        self.init_att_error = np.deg2rad([0.5, 0.5, 1])  # Initial attitude error
+        # SINS误差参数（增加时变特性）
+        self.gyro_bias = np.array([0.1, 0.15, -0.08])  # 固定偏置(度/小时)
+        self.gyro_rw = np.array([0.01, 0.015, 0.008])  # 随机游走(度/√h)
+        self.accel_bias = np.array([0.02, 0.03, 0.01])  # 固定偏置(mg)
+        self.accel_markov = np.array([0.005, 0.007, 0.003])  # 一阶马尔科夫过程(mg)
+        self.init_att_error = np.deg2rad([0.5, 0.5, 1])  # 初始姿态误差
         
-        # DVL error model
-        self.dvl_scale = 5e-4  # Velocity scale error, reduced by half
-        self.dvl_noise = 0.05  # White noise (m/s), reduced by half
-        self.dvl_install_angle = np.deg2rad([0.3, -0.2, 0.8])  # Installation bias angle [3](@ref), reduced installation bias
-        self.dvl_height_threshold = 150  # Bottom-lock height threshold (m)[9](@ref)
+        # DVL误差模型
+        self.dvl_scale = 5e-4  # 速度比例误差，减小一半
+        self.dvl_noise = 0.05  # 白噪声(m/s)，减小一半
+        self.dvl_install_angle = np.deg2rad([0.3, -0.2, 0.8])  # 安装偏差角[3](@ref)，减小安装偏差
+        self.dvl_height_threshold = 150  # 底锁高度阈值(m)[9](@ref)
         
-        # USBL error model
-        self.usbl_pos_error = np.array([0.3, 0.3, 0.3])  # Position error standard deviation (m), reduced error
-        self.usbl_time_sync_error = 0.05  # Time synchronization error (s)[4](@ref), reduced sync error
-        self.usbl_update_interval = 5  # seconds
+        # USBL误差模型
+        self.usbl_pos_error = np.array([0.3, 0.3, 0.3])  # 位置误差标准差(m)，减小误差
+        self.usbl_time_sync_error = 0.05  # 时间同步误差(s)[4](@ref)，减小时间同步误差
+        self.usbl_update_interval = 5  # 秒
         
-        # Depth sensor error model [6](@ref)
-        self.depth_bias = 0.05  # Static bias (m)
-        self.depth_nonlinear = 0.02 # Nonlinear error (%FS)
-        self.depth_temp_drift = 0.001  # Temperature drift (°C^-1)
+        # 深度传感器误差模型[6](@ref)
+        self.depth_bias = 0.05  # 静态偏置(m)
+        self.depth_nonlinear = 0.02 # 非线性误差(%FS)
+        self.depth_temp_drift = 0.001  # 温度漂移(°C^-1)
         
-        # Environmental disturbance parameters [1](@ref)
-        self.current_speed = 0.1  # Ocean current velocity (m/s)
-        self.current_dir = np.deg2rad(45)  # Ocean current direction
-        self.wave_amplitude = 0.5  # Wave disturbance amplitude (m)
+        # 环境扰动参数[1](@ref)
+        self.current_speed = 0.1  # 洋流速度(m/s)
+        self.current_dir = np.deg2rad(45)  # 洋流方向
+        self.wave_amplitude = 0.5  # 波浪扰动幅值(m)
         
-        # Time parameters
-        self.dt = 0.1  # Sampling time
-        self.total_time = 600  # Total duration (seconds)
+        # 时间参数
+        self.dt = 0.1  # 采样时间
+        self.total_time = 600  # 总时长(秒)
+
+
+        

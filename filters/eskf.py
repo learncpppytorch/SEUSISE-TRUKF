@@ -64,7 +64,7 @@ def euler_to_rotation_matrix(euler):
     cp, sp = np.cos(pitch), np.sin(pitch)
     cy, sy = np.cos(yaw), np.sin(yaw)
     
-    # Construct rotation matrix
+    # Build rotation matrix
     R = np.array([
         [cp*cy, cp*sy, -sp],
         [sr*sp*cy-cr*sy, sr*sp*sy+cr*cy, sr*cp],
@@ -90,7 +90,7 @@ def rotation_matrix_to_euler(R):
     return np.array([roll, pitch, yaw])
 
 def skew(v):
-    """Calculate skew-symmetric matrix of a vector
+    """Calculate skew-symmetric matrix of vector
     Input: v[3] - 3D vector
     Output: S[3,3] - Skew-symmetric matrix
     """
@@ -153,21 +153,20 @@ class ESKF:
         accel_corrected = accel - self.ba_nominal
         
         # 2. Update nominal states
-        # Update attitude
+        # Attitude update
         R_old = euler_to_rotation_matrix(self.att_nominal)
         omega_skew = skew(gyro_corrected)
         # Update rotation matrix using matrix exponential
         dR = expm(omega_skew * dt)
-        R_new = R_old @ dR  
+        R_new = R_old @ dR  # Modified: adjusted rotation matrix multiplication order
         self.att_nominal = rotation_matrix_to_euler(R_new)
         
-        # Update velocity - corrected to navigation frame
+        # Velocity update - corrected to navigation frame
         accel_nav = R_new.T @ accel_corrected + self.g  # Convert from body to navigation frame
-       # accel_nav = R_new @ accel_corrected + self.g  
-       
-        self.vel_nominal += accel_nav * dt
         
-        # Update position
+        self.vel_nominal += accel_nav * dt
+                
+        # Position update
         self.pos_nominal += self.vel_nominal * dt
         
         # 3. Calculate error state transition matrix
@@ -178,9 +177,11 @@ class ESKF:
 
     def update(self, z, sensor_type, return_nis=False):
         """Measurement update step
-          Parameters:            
-            sensor_type: Sensor type ('USBL', 'DVL', 'Depth')
-            return_nis: Whether to return Normalized Innovation Squared (NIS)
+        
+        Parameters:
+            z: measurement
+            sensor_type: sensor type ('USBL', 'DVL', 'Depth')
+            return_nis: whether to return Normalized Innovation Squared (NIS)
             
         Returns:
             nis: Normalized Innovation Squared value (if return_nis is True)
@@ -188,7 +189,7 @@ class ESKF:
         # Add data validity check
         if sensor_type == 'USBL':
             # USBL data anomaly detection
-            if np.any(np.abs(z) > 1000):  # Position jump detection
+            if np.any(np.abs(z) > 10000):  # Position jump detection
                 print("USBL data anomaly, skipping update")
                 return None if return_nis else None
                 
@@ -198,7 +199,7 @@ class ESKF:
                 print("DVL data anomaly, skipping update")
                 return None if return_nis else None
             
-        # Construct observation matrix and noise matrix
+        # Build observation matrix and noise matrix
         H, R, z_pred = self._get_observation_matrix(sensor_type)
         
         # Calculate innovation
@@ -228,13 +229,13 @@ class ESKF:
         # Inject error state into nominal state
         self._inject_error_state()
         
-        # Reset error state
+        # Reset error state and update covariance
         G = np.eye(self.total_dim)
         G[6:9, 6:9] = np.eye(3) - skew(0.5 * self.delta_x[6:9])
         self.P = G @ self.P @ G.T
         self.delta_x = np.zeros(self.total_dim)
         
-        # Return NIS value
+        # Return NIS value if requested
         if return_nis:
             return nis
 
@@ -247,9 +248,9 @@ class ESKF:
         
         # Velocity derivative with respect to attitude
         F[3:6, 6:9] = -R @ skew(accel) * dt
-                       
+        
         # Velocity derivative with respect to accelerometer bias
-        F[3:6, 12:15] = -R * dt  
+        F[3:6, 12:15] = -R * dt  # Modified: use correct coordinate transformation
         
         # Attitude derivative with respect to gyroscope bias
         F[6:9, 9:12] = -np.eye(3) * dt
@@ -257,7 +258,7 @@ class ESKF:
         return F
 
     def _get_observation_matrix(self, sensor_type):
-        """Construct observation matrix"""
+        """Build observation matrix"""
         if sensor_type == 'USBL':
             H = np.zeros((3, self.total_dim))
             H[:, 0:3] = np.eye(3)

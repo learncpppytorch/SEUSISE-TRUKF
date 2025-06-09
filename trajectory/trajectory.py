@@ -1,7 +1,8 @@
 import numpy as np
 
 def generate_true_trajectory(params):
-    """   
+    """
+    生成简化的水下导航轨迹，确保轨迹连续性，避免跳变
     包含典型的水下运动场景：下潜、平面巡航、定深航行、上浮等
     
     参数:
